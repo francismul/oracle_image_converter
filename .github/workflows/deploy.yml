@@ -2,8 +2,8 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
 
 jobs:
   build-and-deploy:
@@ -17,8 +17,13 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Get tag name
+        id: tag
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
       - name: Build (static site, no build step needed)
         run: |
+          echo "Building for tag: ${{ steps.tag.outputs.tag }}"
           echo "No build step required for static site."
 
       - name: Deploy to GitHub Pages
@@ -28,3 +33,4 @@ jobs:
           publish_dir: ./
           publish_branch: gh-pages
           force_orphan: true
+          tag: ${{ steps.tag.outputs.tag }}
