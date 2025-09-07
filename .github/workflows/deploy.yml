@@ -33,4 +33,5 @@ jobs:
           publish_dir: ./
           publish_branch: gh-pages
           force_orphan: true
-          tag: ${{ steps.tag.outputs.tag }}
+          tag_name: ${{ steps.tag.outputs.tag }}
+          tag_message: 'Deploy ${{ steps.tag.outputs.tag }}'
