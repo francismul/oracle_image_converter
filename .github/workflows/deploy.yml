@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     tags:
-      - 'v*'
+      - "v*.*.*"
 
 jobs:
   build-and-deploy:
@@ -15,15 +15,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Get tag name
-        id: tag
-        run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          node-version: "20"
 
       - name: Build (static site, no build step needed)
         run: |
-          echo "Building for tag: ${{ steps.tag.outputs.tag }}"
           echo "No build step required for static site."
 
       - name: Deploy to GitHub Pages
@@ -33,5 +28,3 @@ jobs:
           publish_dir: ./
           publish_branch: gh-pages
           force_orphan: true
-          tag_name: ${{ steps.tag.outputs.tag }}
-          tag_message: 'Deploy ${{ steps.tag.outputs.tag }}'
