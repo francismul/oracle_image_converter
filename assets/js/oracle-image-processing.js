@@ -6,8 +6,8 @@ let conversionResults = [];
 
 // Check if GIF libraries are loaded
 function checkGifLibraries() {
-  if (typeof GIF === "undefined" || typeof window.GifuctJS === "undefined") {
-    showError("GIF processing libraries not loaded. Please refresh the page.");
+  if (typeof window.GifWriter === "undefined" || typeof window.GifReader === "undefined") {
+    showError("GIF processing library not loaded. Please refresh the page.");
     return false;
   }
   return true;
@@ -19,10 +19,10 @@ document.addEventListener("DOMContentLoaded", function () {
   setTimeout(() => {
     if (!checkGifLibraries()) {
       console.warn(
-        "GIF libraries not available. GIF processing will be limited."
+        "GIF library not available. GIF processing will be limited."
       );
     } else {
-      console.log("✅ GIF processing libraries loaded successfully");
+      console.log("✅ GIF processing library loaded successfully");
     }
   }, 12000);
 });
@@ -283,11 +283,11 @@ async function convertStaticImage(format) {
   });
 }
 
-// Enhanced GIF conversion with frame processing
+// Enhanced GIF conversion with omggif
 async function convertGifImage(format) {
   // Check if GIF libraries are available
   if (!checkGifLibraries()) {
-    throw new Error("GIF processing libraries not available");
+    throw new Error("GIF processing library not available");
   }
 
   return new Promise((resolve, reject) => {
@@ -295,24 +295,33 @@ async function convertGifImage(format) {
     reader.onload = async function (e) {
       try {
         const buffer = e.target.result;
-        const gif = new window.GifuctJS.Gif(new Uint8Array(buffer));
-        const frames = gif.decompressFrames(true);
+        const uint8Array = new Uint8Array(buffer);
+        
+        // Create GIF reader using omggif
+        const gifReader = new window.GifReader(uint8Array);
+        const numFrames = gifReader.numFrames();
 
-        if (!frames || frames.length === 0) {
+        if (numFrames === 0) {
           throw new Error("Could not process GIF frames");
         }
+
+        // Get GIF dimensions
+        const gifWidth = gifReader.width;
+        const gifHeight = gifReader.height;
 
         // Create live preview with first frame
         const livePreview = createLivePreview(format);
         const canvasPreview = document.createElement("canvas");
-        canvasPreview.width = frames[0].dims.width;
-        canvasPreview.height = frames[0].dims.height;
+        canvasPreview.width = gifWidth;
+        canvasPreview.height = gifHeight;
         const ctx = canvasPreview.getContext("2d");
-        const imageData = ctx.createImageData(
-          frames[0].dims.width,
-          frames[0].dims.height
-        );
-        imageData.data.set(frames[0].patch);
+        
+        // Decode first frame for preview
+        const firstFramePixels = new Uint8Array(gifWidth * gifHeight * 4);
+        gifReader.decodeAndBlitFrameRGBA(0, firstFramePixels);
+        
+        const imageData = ctx.createImageData(gifWidth, gifHeight);
+        imageData.data.set(firstFramePixels);
         ctx.putImageData(imageData, 0, 0);
         livePreview.src = canvasPreview.toDataURL();
 
@@ -320,88 +329,98 @@ async function convertGifImage(format) {
         const targetSize = selectedSizes[format];
         let { width, height } = calculateDimensions(
           targetSize,
-          frames[0].dims.width,
-          frames[0].dims.height
+          gifWidth,
+          gifHeight
         );
 
-        // Create GIF encoder with better settings
-        const gifEncoder = new GIF({
-          workers: Math.min(2, navigator.hardwareConcurrency || 2),
-          quality: 10,
-          width: width,
-          height: height,
-          transparent: null,
-          dithering: false,
-          workerScript:
-            "https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js",
+        // Create GIF writer using omggif
+        const gifBufferSize = width * height * numFrames * 4; // Conservative estimate
+        const gifBuffer = new Uint8Array(gifBufferSize);
+        const gifWriter = new window.GifWriter(gifBuffer, width, height, {
+          loop: 0 // Infinite loop
         });
 
         // Update status
         const statusElement =
           livePreview.parentElement.querySelector("p:last-child");
-        statusElement.textContent = `Processing ${frames.length} frames...`;
+        statusElement.textContent = `Processing ${numFrames} frames...`;
 
-        // Process each frame with proper error handling
-        let processedFrames = 0;
-        frames.forEach((frame, index) => {
+        // Create a basic palette (grayscale for simplicity)
+        const palette = [];
+        for (let i = 0; i < 256; i++) {
+          const gray = i;
+          palette.push((gray << 16) | (gray << 8) | gray);
+        }
+
+        // Process each frame
+        for (let frameIndex = 0; frameIndex < numFrames; frameIndex++) {
           try {
-            const canvasFrame = document.createElement("canvas");
-            canvasFrame.width = width;
-            canvasFrame.height = height;
-            const ctxFrame = canvasFrame.getContext("2d");
+            const frameInfo = gifReader.frameInfo(frameIndex);
+            const framePixels = new Uint8Array(gifWidth * gifHeight * 4);
+            gifReader.decodeAndBlitFrameRGBA(frameIndex, framePixels);
 
-            // Create original frame
+            // Create canvas for this frame
+            const frameCanvas = document.createElement("canvas");
+            frameCanvas.width = width;
+            frameCanvas.height = height;
+            const frameCtx = frameCanvas.getContext("2d");
+
+            // Create original frame canvas
             const originalCanvas = document.createElement("canvas");
-            originalCanvas.width = frame.dims.width;
-            originalCanvas.height = frame.dims.height;
+            originalCanvas.width = gifWidth;
+            originalCanvas.height = gifHeight;
             const originalCtx = originalCanvas.getContext("2d");
-            const imgData = originalCtx.createImageData(
-              frame.dims.width,
-              frame.dims.height
-            );
-            imgData.data.set(frame.patch);
-            originalCtx.putImageData(imgData, 0, 0);
+            
+            const originalImageData = originalCtx.createImageData(gifWidth, gifHeight);
+            originalImageData.data.set(framePixels);
+            originalCtx.putImageData(originalImageData, 0, 0);
 
             // Scale to target size
-            ctxFrame.drawImage(originalCanvas, 0, 0, width, height);
+            frameCtx.drawImage(originalCanvas, 0, 0, width, height);
 
-            gifEncoder.addFrame(ctxFrame, {
-              copy: true,
-              delay: Math.max(frame.delay || 100, 50), // Ensure minimum delay
+            // Get scaled frame data
+            const scaledImageData = frameCtx.getImageData(0, 0, width, height);
+            const scaledPixels = new Uint8Array(width * height);
+            
+            // Convert RGBA to indexed color (simple grayscale approach)
+            for (let i = 0; i < scaledImageData.data.length; i += 4) {
+              const r = scaledImageData.data[i];
+              const g = scaledImageData.data[i + 1];
+              const b = scaledImageData.data[i + 2];
+              const a = scaledImageData.data[i + 3];
+              
+              // Simple luminance calculation
+              const luminance = Math.floor(0.299 * r + 0.587 * g + 0.114 * b);
+              scaledPixels[i / 4] = a === 0 ? 0 : Math.min(255, luminance);
+            }
+
+            // Add frame to GIF writer
+            const delay = Math.max(frameInfo.delay || 10, 5); // Minimum delay of 50ms
+            gifWriter.addFrame(0, 0, width, height, scaledPixels, {
+              delay: delay,
+              disposal: frameInfo.disposal || 0,
+              palette: palette
             });
 
-            processedFrames++;
-            statusElement.textContent = `Processing frame ${processedFrames}/${frames.length}...`;
+            statusElement.textContent = `Processing frame ${frameIndex + 1}/${numFrames}...`;
+            updateProgress(((frameIndex + 1) / numFrames) * 80); // 80% for frame processing
           } catch (frameError) {
-            console.warn(`Error processing frame ${index}:`, frameError);
+            console.warn(`Error processing frame ${frameIndex}:`, frameError);
           }
-        });
+        }
 
-        gifEncoder.on("finished", function (blob) {
-          hideProgress();
-          addConversionResult(format, blob, null, targetSize, livePreview);
-          showSuccess(
-            `Successfully converted GIF with ${
-              frames.length
-            } frames to ${format.toUpperCase()}!`
-          );
-          resolve();
-        });
+        // Get the final GIF data
+        const finalLength = gifWriter.end();
+        const gifData = gifBuffer.slice(0, finalLength);
+        const blob = new Blob([gifData], { type: 'image/gif' });
 
-        gifEncoder.on("progress", function (p) {
-          updateProgress(p * 100);
-          if (statusElement) {
-            statusElement.textContent = `Encoding GIF: ${Math.round(p * 100)}%`;
-          }
-        });
+        hideProgress();
+        addConversionResult(format, blob, null, targetSize, livePreview);
+        showSuccess(
+          `Successfully converted GIF with ${numFrames} frames to ${format.toUpperCase()}!`
+        );
+        resolve();
 
-        gifEncoder.on("abort", function () {
-          hideProgress();
-          reject(new Error("GIF encoding was aborted"));
-        });
-
-        // Start rendering
-        gifEncoder.render();
       } catch (error) {
         hideProgress();
         reject(error);
@@ -938,77 +957,104 @@ async function processBatchGif(file, format, size, index, resultsContainer) {
     reader.onload = async function (e) {
       try {
         const buffer = e.target.result;
-        const gif = new window.GifuctJS.Gif(new Uint8Array(buffer));
-        const frames = gif.decompressFrames(true);
+        const uint8Array = new Uint8Array(buffer);
+        
+        // Create GIF reader using omggif
+        const gifReader = new window.GifReader(uint8Array);
+        const numFrames = gifReader.numFrames();
 
-        if (!frames || frames.length === 0) {
+        if (numFrames === 0) {
           throw new Error("Could not process GIF frames");
         }
+
+        // Get GIF dimensions
+        const gifWidth = gifReader.width;
+        const gifHeight = gifReader.height;
 
         // Calculate target dimensions
         let width, height;
         if (size === "original") {
-          width = frames[0].dims.width;
-          height = frames[0].dims.height;
+          width = gifWidth;
+          height = gifHeight;
         } else {
-          const dimensions = calculateDimensions(
-            size,
-            frames[0].dims.width,
-            frames[0].dims.height
-          );
+          const dimensions = calculateDimensions(size, gifWidth, gifHeight);
           width = dimensions.width;
           height = dimensions.height;
         }
 
-        const gifEncoder = new GIF({
-          workers: 1, // Use fewer workers for batch processing
-          quality: 10,
-          width: width,
-          height: height,
+        // Create GIF writer using omggif
+        const gifBufferSize = width * height * numFrames * 4; // Conservative estimate
+        const gifBuffer = new Uint8Array(gifBufferSize);
+        const gifWriter = new window.GifWriter(gifBuffer, width, height, {
+          loop: 0 // Infinite loop
         });
 
-        frames.forEach((frame) => {
-          const canvasFrame = document.createElement("canvas");
-          canvasFrame.width = width;
-          canvasFrame.height = height;
-          const ctxFrame = canvasFrame.getContext("2d");
+        // Create a basic palette (grayscale for simplicity)
+        const palette = [];
+        for (let i = 0; i < 256; i++) {
+          const gray = i;
+          palette.push((gray << 16) | (gray << 8) | gray);
+        }
 
+        // Process each frame
+        for (let frameIndex = 0; frameIndex < numFrames; frameIndex++) {
+          const frameInfo = gifReader.frameInfo(frameIndex);
+          const framePixels = new Uint8Array(gifWidth * gifHeight * 4);
+          gifReader.decodeAndBlitFrameRGBA(frameIndex, framePixels);
+
+          // Create canvas for this frame
+          const frameCanvas = document.createElement("canvas");
+          frameCanvas.width = width;
+          frameCanvas.height = height;
+          const frameCtx = frameCanvas.getContext("2d");
+
+          // Create original frame canvas
           const originalCanvas = document.createElement("canvas");
-          originalCanvas.width = frame.dims.width;
-          originalCanvas.height = frame.dims.height;
+          originalCanvas.width = gifWidth;
+          originalCanvas.height = gifHeight;
           const originalCtx = originalCanvas.getContext("2d");
-          const imgData = originalCtx.createImageData(
-            frame.dims.width,
-            frame.dims.height
-          );
-          imgData.data.set(frame.patch);
-          originalCtx.putImageData(imgData, 0, 0);
+          
+          const originalImageData = originalCtx.createImageData(gifWidth, gifHeight);
+          originalImageData.data.set(framePixels);
+          originalCtx.putImageData(originalImageData, 0, 0);
 
-          ctxFrame.drawImage(originalCanvas, 0, 0, width, height);
-          gifEncoder.addFrame(ctxFrame, {
-            copy: true,
-            delay: frame.delay || 100,
+          // Scale to target size
+          frameCtx.drawImage(originalCanvas, 0, 0, width, height);
+
+          // Get scaled frame data
+          const scaledImageData = frameCtx.getImageData(0, 0, width, height);
+          const scaledPixels = new Uint8Array(width * height);
+          
+          // Convert RGBA to indexed color (simple grayscale approach)
+          for (let i = 0; i < scaledImageData.data.length; i += 4) {
+            const r = scaledImageData.data[i];
+            const g = scaledImageData.data[i + 1];
+            const b = scaledImageData.data[i + 2];
+            const a = scaledImageData.data[i + 3];
+            
+            // Simple luminance calculation
+            const luminance = Math.floor(0.299 * r + 0.587 * g + 0.114 * b);
+            scaledPixels[i / 4] = a === 0 ? 0 : Math.min(255, luminance);
+          }
+
+          // Add frame to GIF writer
+          const delay = Math.max(frameInfo.delay || 10, 5); // Minimum delay
+          gifWriter.addFrame(0, 0, width, height, scaledPixels, {
+            delay: delay,
+            disposal: frameInfo.disposal || 0,
+            palette: palette
           });
-        });
+        }
 
-        gifEncoder.on("finished", function (blob) {
-          updateBatchItemStatus(
-            index,
-            resultsContainer,
-            "Completed",
-            "#10b981"
-          );
-          addBatchDownloadButton(
-            index,
-            resultsContainer,
-            blob,
-            file.name,
-            format
-          );
-          resolve();
-        });
+        // Get the final GIF data
+        const finalLength = gifWriter.end();
+        const gifData = gifBuffer.slice(0, finalLength);
+        const blob = new Blob([gifData], { type: 'image/gif' });
 
-        gifEncoder.render();
+        updateBatchItemStatus(index, resultsContainer, "Completed", "#10b981");
+        addBatchDownloadButton(index, resultsContainer, blob, file.name, format);
+        resolve();
+
       } catch (error) {
         reject(error);
       }
