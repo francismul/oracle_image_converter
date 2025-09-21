@@ -1,4 +1,4 @@
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const CACHE_NAME = `oracle-mode-cache-${CACHE_VERSION}`;
 const BASE = "/oracle_image_converter";
 
