@@ -4,18 +4,25 @@
     <title>Oracle Mode - Image Converter & Icon Generator</title>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    
+
     <!-- PWA Meta Tags -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#6a5acd">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Oracle Mode">
-    <link rel="apple-touch-icon" href="assets/images/icon-192.jpg">
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
-    <script src="https://unpkg.com/gifuct-js/dist/gifuct.min.js"></script>
-    <link rel="stylesheet" href="assets/css/oracle-image-processing.css">
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#6a5acd" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <link
+      rel="shortcut icon"
+      href="assets/images/favicon.ico"
+      type="image/x-icon"
+    />
+    <meta name="apple-mobile-web-app-title" content="Oracle Mode" />
+    <link rel="apple-touch-icon" href="assets/images/icon-192.jpg" />
+
+    <script src="assets/js/omggif.min.js"></script>
+    <link rel="stylesheet" href="assets/css/oracle-image-processing.css" />
   </head>
   <body>
     <div class="container">
@@ -190,7 +197,7 @@
                   >400×300</span
                 >
               </div>
-              <p style="font-size: 0.8em; color: #888; margin: 10px 0;">
+              <p style="font-size: 0.8em; color: #888; margin: 10px 0">
                 ✨ Enhanced: Preserves animation, processes all frames
               </p>
               <button class="btn" onclick="convertImage('gif')">
@@ -276,6 +283,7 @@
                     <option value="png">PNG</option>
                     <option value="jpeg">JPEG</option>
                     <option value="webp">WEBP</option>
+                    <option value="gif">GIF</option>
                   </select>
                 </label>
               </div>
@@ -305,102 +313,149 @@
     </div>
 
     <script src="assets/js/oracle-image-processing.js"></script>
-    
+
+    <!-- PWA Service Worker Registration -->
+    <script src="assets/js/oracle-image-processing.js"></script>
+
     <!-- PWA Service Worker Registration -->
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/sw.js")
             .then((registration) => {
-              console.log('SW registered: ', registration);
-              
+              console.log("SW registered: ", registration);
+
               // Check for updates
-              registration.addEventListener('updatefound', () => {
+              registration.addEventListener("updatefound", () => {
                 const newWorker = registration.installing;
-                newWorker.addEventListener('statechange', () => {
-                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    // New content is available, refresh to update
-                    if (confirm('New version available! Refresh to update?')) {
-                      window.location.reload();
-                    }
+                newWorker.addEventListener("statechange", () => {
+                  if (
+                    newWorker.state === "installed" &&
+                    navigator.serviceWorker.controller
+                  ) {
+                    // 🔔 Show toast instead of confirm
+                    showUpdateToast();
                   }
                 });
               });
             })
             .catch((registrationError) => {
-              console.log('SW registration failed: ', registrationError);
+              console.log("SW registration failed: ", registrationError);
             });
         });
       }
 
+      // Toast notification for new version
+      function showUpdateToast() {
+        const toast = document.createElement("div");
+        toast.innerHTML = `
+      🚀 A new version is available!
+      <button id="refreshBtn" style="
+        margin-left:10px;
+        background:#fff;
+        color:#333;
+        border:none;
+        padding:6px 12px;
+        border-radius:4px;
+        cursor:pointer;
+      ">Refresh</button>
+    `;
+        toast.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 6px;
+      font-family: sans-serif;
+      font-size: 14px;
+      z-index: 9999;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      animation: fadeIn 0.3s ease;
+    `;
+
+        document.body.appendChild(toast);
+
+        // Button action
+        document.getElementById("refreshBtn").onclick = () => {
+          toast.remove();
+          window.location.reload();
+        };
+
+        // Auto-hide after 15s
+        setTimeout(() => {
+          toast.style.opacity = "0";
+          toast.style.transition = "opacity 0.5s";
+          setTimeout(() => toast.remove(), 500);
+        }, 15000);
+      }
+
       // PWA Install prompt
       let deferredPrompt;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent Chrome 67 and earlier from automatically showing the prompt
+      window.addEventListener("beforeinstallprompt", (e) => {
         e.preventDefault();
-        // Stash the event so it can be triggered later
         deferredPrompt = e;
-        
-        // Show install button/banner
         showInstallPromotion();
       });
 
       function showInstallPromotion() {
-        // Create install button if it doesn't exist
-        if (!document.getElementById('installBtn')) {
-          const installBtn = document.createElement('button');
-          installBtn.id = 'installBtn';
-          installBtn.textContent = '📱 Install App';
-          installBtn.className = 'btn install-btn';
+        if (!document.getElementById("installBtn")) {
+          const installBtn = document.createElement("button");
+          installBtn.id = "installBtn";
+          installBtn.textContent = "📱 Install App";
+          installBtn.className = "btn install-btn";
           installBtn.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1000;
-            background: linear-gradient(135deg, #6a5acd, #483d8b);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 25px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(106, 90, 205, 0.3);
-            transition: all 0.3s ease;
-          `;
-          
-          installBtn.addEventListener('click', () => {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+        background: linear-gradient(135deg, #6a5acd, #483d8b);
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 25px;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(106, 90, 205, 0.3);
+        transition: all 0.3s ease;
+      `;
+
+          installBtn.addEventListener("click", () => {
             if (deferredPrompt) {
               deferredPrompt.prompt();
               deferredPrompt.userChoice.then((choiceResult) => {
-                if (choiceResult.outcome === 'accepted') {
-                  console.log('User accepted the install prompt');
+                if (choiceResult.outcome === "accepted") {
+                  console.log("User accepted the install prompt");
                   installBtn.remove();
                 } else {
-                  console.log('User dismissed the install prompt');
+                  console.log("User dismissed the install prompt");
                 }
                 deferredPrompt = null;
               });
             }
           });
-          
-          installBtn.addEventListener('mouseenter', () => {
-            installBtn.style.transform = 'translateY(-2px)';
-            installBtn.style.boxShadow = '0 6px 20px rgba(106, 90, 205, 0.4)';
+
+          installBtn.addEventListener("mouseenter", () => {
+            installBtn.style.transform = "translateY(-2px)";
+            installBtn.style.boxShadow = "0 6px 20px rgba(106, 90, 205, 0.4)";
           });
-          
-          installBtn.addEventListener('mouseleave', () => {
-            installBtn.style.transform = 'translateY(0)';
-            installBtn.style.boxShadow = '0 4px 15px rgba(106, 90, 205, 0.3)';
+
+          installBtn.addEventListener("mouseleave", () => {
+            installBtn.style.transform = "translateY(0)";
+            installBtn.style.boxShadow = "0 4px 15px rgba(106, 90, 205, 0.3)";
           });
-          
+
           document.body.appendChild(installBtn);
         }
       }
 
-      window.addEventListener('appinstalled', (evt) => {
-        console.log('App was installed');
-        const installBtn = document.getElementById('installBtn');
+      window.addEventListener("appinstalled", (evt) => {
+        console.log("App was installed");
+        const installBtn = document.getElementById("installBtn");
         if (installBtn) {
           installBtn.remove();
         }
