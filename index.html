@@ -1,7 +1,6 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Oracle Mode - Image Converter & Icon Generator</title>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -19,11 +18,23 @@
       type="image/x-icon"
     />
     <meta name="apple-mobile-web-app-title" content="Oracle Mode" />
-    <link rel="apple-touch-icon" href="assets/images/icon-192.jpg" />
+    <link rel="stylesheet" href="assets/css/oracle-image-processing.css" />
+    <link
+      rel="apple-touch-icon"
+      sizes="512x512"
+      href="assets/images/icon-512.jpg"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="192x192"
+      href="assets/images/icon-192.jpg"
+    />
+
+    <title>Oracle Mode - Image Converter & Icon Generator</title>
 
     <script src="assets/js/omggif.min.js"></script>
-    <link rel="stylesheet" href="assets/css/oracle-image-processing.css" />
   </head>
+
   <body>
     <div class="container">
       <div class="header">
@@ -319,7 +330,7 @@
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
           navigator.serviceWorker
-            .register("sw.js")
+            .register("service-worker.js")
             .then((registration) => {
               console.log("SW registered: ", registration);
 

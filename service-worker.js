@@ -112,8 +112,8 @@ self.addEventListener("sync", (event) => {
 self.addEventListener("push", (event) => {
   const options = {
     body: event.data ? event.data.text() : "New notification",
-    icon: "/assets/images/icon-192.jpg",
-    badge: "/assets/images/icon-192.jpg",
+    icon: "assets/images/icon-192.jpg",
+    badge: "assets/images/icon-192.jpg",
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),
